@@ -1,4 +1,3 @@
-from calendar import EPOCH
 import gzip
 import shutil
 import time
@@ -6,10 +5,9 @@ import time
 import pandas as pd
 import requests
 import torch
-import torch.nn.functional as F
-import torchtext
+from pathlib import Path
 
-import transformers
+from transformers.optimization import get_linear_schedule_with_warmup
 from transformers import DistilBertTokenizerFast
 from transformers import DistilBertForSequenceClassification
 import os
@@ -26,23 +24,26 @@ torch.manual_seed(RANDOM_SEED)
 DEVICE = torch.device("gpu:3" if torch.cuda.is_available() else "cpu")
 SPLIT = 0.8
 LR = 0.0004
+WEIGHT_DECAY = 0.01
 BATCH_SIZE = 16
 EPOCHS = 3
+data_dir = os.path.join(os.path.abspath(os.curdir), "data")
+Path(data_dir).mkdir(parents=True, exist_ok=True)
 # data
 url = "https://github.com/rasbt/machine-learning-book/raw/main/ch08/movie_data.csv.gz"
 filename_compress = url.split("/")[-1]
 filename_uncompressed = ".".join(filename_compress.split(".")[:-2])
 
 if os.path.exists(filename_uncompressed) is False:
-    with open(filename_compress, "wb") as f:
+    with open(os.path.join(data_dir, filename_compress), "wb") as f:
         request = requests.get(url)
         f.write(request.content)
 
-    with gzip.open(filename_compress, "rb") as f_in:
-        with open(filename_uncompressed, "wb") as f_out:
+    with gzip.open(os.path.join(data_dir, filename_compress), "rb") as f_in:
+        with open(os.path.join(data_dir, filename_uncompressed), "wb") as f_out:
             shutil.copyfileobj(f_in, f_out)
 
-data = pd.read_csv(filename_uncompressed)
+data = pd.read_csv(os.path.join(data_dir, filename_uncompressed))
 print(data.head())
 print(data.shape)
 
@@ -111,9 +112,18 @@ model = DistilBertForSequenceClassification.from_pretrained("distilbert-base-unc
 model.to(DEVICE)
 model.train()
 
-# optimizer
+# optimizer 1
 optimizer = torch.optim.Adam(model.parameters(), lr=LR)
+# Recomendations :
+#  Apply Adam W , weight decay decoupled weight decay see paper:
+#  https://arxiv.org/pdf/1711.05101.pdf
 
+optimizer = torch.optim.AdamW(model.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
+scheduler = get_linear_schedule_with_warmup(
+    optimizer=optimizer,
+    num_warmup_steps=500,
+    num_training_steps=EPOCHS * len(train_loader),
+)
 # Train the model
 
 
@@ -136,9 +146,13 @@ def accuracy_fn(model, data_loader):
         return (correct_prediction.float() / num_samples) * 100
 
 
-for epoch in EPOCHS:
+# You can use a Trainer object in transformers library , to wrap
+# the model train instead of using this
+
+start_time = time.time()
+for epoch in range(EPOCHS):
     model.train()
-    for batch in train_loader:
+    for idx, batch in enumerate(train_loader):
         input_ids = batch["input_ids"].to(DEVICE)
         attention_mask = batch["attention_mask"].to(DEVICE)
         labels = batch["labels"].to(DEVICE)
@@ -151,5 +165,22 @@ for epoch in EPOCHS:
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-
+        # From hugging face recomendations
+        scheduler.step()
         # logging
+        if idx % 250 == 0:
+            print(f"EPOCH: {epoch:04d}/{EPOCHS:04d}")
+            print(f"BATCH: {idx:04d}/{len(train_loader):04d}")
+            print(f"LOSS: {loss:.4f}")
+
+    model.eval()
+    with torch.set_grad_enabled(False):
+        print(
+            f"Train accuracy: {accuracy_fn(model, train_loader):.2f}%"
+            f"| Validation accuracy: {accuracy_fn(model, validation_loader):.2f}%"
+        )
+
+print(
+    f"Training time : {(start_time - time.time())/60:.2f}%"
+    f"| Test accuracy: {accuracy_fn(model, test_loader):.2f}"
+)

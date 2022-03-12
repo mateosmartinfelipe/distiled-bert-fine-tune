@@ -28,7 +28,9 @@ WEIGHT_DECAY = 0.01
 BATCH_SIZE = 16
 EPOCHS = 3
 data_dir = os.path.join(os.path.abspath(os.curdir), "data")
+trained_model_dir = os.path.join(os.path.abspath(os.curdir), "bin")
 Path(data_dir).mkdir(parents=True, exist_ok=True)
+Path(trained_model_dir).mkdir(parents=True, exist_ok=True)
 # data
 url = "https://github.com/rasbt/machine-learning-book/raw/main/ch08/movie_data.csv.gz"
 filename_compress = url.split("/")[-1]
@@ -168,10 +170,12 @@ for epoch in range(EPOCHS):
         # From hugging face recomendations
         scheduler.step()
         # logging
-        if idx % 250 == 0:
-            print(f"EPOCH: {epoch:04d}/{EPOCHS:04d}")
-            print(f"BATCH: {idx:04d}/{len(train_loader):04d}")
-            print(f"LOSS: {loss:.4f}")
+        if idx % 1 == 0:
+            print(
+                f"EPOCH: {epoch:04d}/{EPOCHS:04d}"
+                f" | BATCH: {idx:04d}/{len(train_loader):04d}"
+                f" | LOSS: {loss:.4f}"
+            )
 
     model.eval()
     with torch.set_grad_enabled(False):
@@ -184,3 +188,9 @@ print(
     f"Training time : {(start_time - time.time())/60:.2f}%"
     f"| Test accuracy: {accuracy_fn(model, test_loader):.2f}"
 )
+
+# saving trained model using torch
+torch.save(model.state_dict(), trained_model_dir)
+# save finetuned model implementing the class PreTrainedModel from huggingface
+# so we can use the model using their api
+model.save_pretrained(trained_model_dir)

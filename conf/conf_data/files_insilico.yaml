@@ -1,0 +1,2 @@
+file: [annotated-in-silico-articles_final.jsonl]
+dir: ${hydra:runtime.cwd}/data/

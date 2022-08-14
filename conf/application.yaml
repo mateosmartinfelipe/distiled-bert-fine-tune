@@ -1,0 +1,25 @@
+defaults:
+  - conf_parameters: parameters
+  - conf_data_insilico : files_insilico
+  - conf_data_fos: files_fos
+  - conf_tokenizer: tokenizer_params
+  - _self_
+# this would overwrite the defaults
+conf_data_insilico : 
+  file: ["annotated-in-silico-articles_final.jsonl"]
+  dir: ${hydra:runtime.cwd}/data/
+# this would overwrite the defaults
+conf_data_fos : 
+  labels_decoder : "Labels.pkl"
+  data: "pub_w_fos_small.parquet"
+  dir: ${hydra:runtime.cwd}/data/
+conf_model:
+  name: "specter-to-classifier"
+  quantized_name : ${.name}-quantized
+  hf_model_name: "allenai/specter" 
+  hf_model_freeze: True
+  build_own_encoder_lang : "basic_english"  
+  build_own_encoder: False
+  dir: ${hydra:runtime.cwd}/model/
+  gpu : True
+

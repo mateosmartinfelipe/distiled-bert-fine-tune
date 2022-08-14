@@ -1,0 +1,3 @@
+labels_decoder : "Labels.pkl"
+data: "pub_w_fos_small.parquet"
+dir: ${hydra:runtime.cwd}/data/

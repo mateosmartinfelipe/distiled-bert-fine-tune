@@ -1,0 +1,5 @@
+padding: True
+truncation: True
+return_tensors: "pt"
+max_length: 512
+folder_name: "tokenizer"

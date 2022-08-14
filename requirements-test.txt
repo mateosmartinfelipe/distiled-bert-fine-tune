@@ -1,0 +1,4 @@
+# hypothesis test
+hypothesis~=6.47
+# test
+pytest~=7.1
